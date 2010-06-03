@@ -36,9 +36,12 @@ class TwitterOAuth {
   /* Immediately retry the API call if the response was not successful. */
   //public $retry = TRUE;
 
-
-
-
+  /* caching options */
+  /* caching responses for an hour only with GET requests */
+  public $cache = 0;
+  /* where cache files will be stored if above is set to true */
+  public $cacheLocation = '/tmp'; 
+  
   /**
    * Set API URLS
    */
@@ -179,12 +182,17 @@ class TwitterOAuth {
     if (strrpos($url, 'https://') !== 0 && strrpos($url, 'http://') !== 0) {
       $url = "{$this->host}{$url}.{$this->format}";
     }
+
+    /* it's ugly, not a valid url, but still unique enough */
+    $this->cache_file_name = md5($url.'?'.join('&', $parameters));
+
     $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, $parameters);
     $request->sign_request($this->sha1_method, $this->consumer, $this->token);
     switch ($method) {
     case 'GET':
       return $this->http($request->to_url(), 'GET');
     default:
+      $this->cache = 0;
       return $this->http($request->get_normalized_http_url(), $method, $request->to_postdata());
     }
   }
@@ -196,6 +204,7 @@ class TwitterOAuth {
    */
   function http($url, $method, $postfields = NULL) {
     $this->http_info = array();
+    
     $ci = curl_init();
     /* Curl settings */
     curl_setopt($ci, CURLOPT_USERAGENT, $this->useragent);
@@ -221,12 +230,26 @@ class TwitterOAuth {
         }
     }
 
+    if ($this->cache) {
+        if (isset($this->cache_refresh)) {
+            unlink($this->cacheLocation."/$file_name");
+        } else if ($this->checkCache($this->cache_file_name, 3600)) {
+            $this->cacheStatus = 'using cached version';
+            return $this->cacheRetrieve($this->cache_file_name);
+        }
+    }
+
     curl_setopt($ci, CURLOPT_URL, $url);
     $response = curl_exec($ci);
     $this->http_code = curl_getinfo($ci, CURLINFO_HTTP_CODE);
     $this->http_info = array_merge($this->http_info, curl_getinfo($ci));
     $this->url = $url;
     curl_close ($ci);
+    
+    if ($this->cache) {
+        $this->cacheFile($response, $this->cache_file_name);
+    }
+    
     return $response;
   }
 
@@ -242,4 +265,61 @@ class TwitterOAuth {
     }
     return strlen($header);
   }
+  
+  	function checkCache($fileName, $time) {
+		$fileName = $this->cacheLocation.'/'.$fileName;
+		
+		if (!file_exists($fileName)) {
+			$this->cache_debug = $fileName . 'does not exist';
+			return 0;
+		}
+
+		if (!$fileTime = filectime($fileName)) {
+			$this->cache_error = 'Could not check the cache time';
+			return 0;
+		}
+
+		// check if the cache is too old
+		if (time() - $fileTime < $time) {
+			$this->cache_debug = 'cache file expired';
+			return 1;
+		}
+		
+		$this->cache_debug = 'cache file still valid';
+		return 0;
+	}
+  
+	function cacheFile($data, $filename) {
+		$new_file = $this->cacheLocation.'/'.$fileName;
+		$fh = fopen($new_file, 'w+');
+		if (!$fh) {
+			$this->cache_error = "Could not open cache file '$filename'";
+			return 0;
+		}
+		if (!fwrite($fh, $data)) {
+			$this->cache_error = "Could not write to cache file '$filename'";
+			fclose($fh);
+			return 0;
+		}
+		fclose($fh);
+		chmod($new_file, 0766);
+	    return 1;
+	}
+  
+    function cacheRetrieve($fileName) {
+        error_reporting(E_ALL ^ E_WARNING ^ E_NOTICE);
+		if (!$fh = fopen($this->cacheLocation.'/'.$fileName, 'r')) {
+			$this->cache_error = 'Could not open cache file';
+			return 0;
+		}
+		error_reporting(E_ALL ^ E_NOTICE);
+
+		$xml = "";
+		while (!feof($fh)) { 
+		    $xml .= fread($fh, 1024); 
+        }
+		fclose($fh);
+
+		return $xml;
+    }
 }
