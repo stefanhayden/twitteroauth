@@ -109,6 +109,10 @@ you wish to include for the API method such as curser or in_reply_to_status_id.
     $status = $connection->post('statuses/update', array('status' => 'Text of status here', 'in_reply_to_status_id' => 123456));
     $status = $connection->delete('statuses/destroy/12345');
 
+10) This is an example of posting a tweet with an image. Make sure you prefix the filename with an at sign.
+
+    $status = $connection->post('statuses/update_with_media', array('status' => 'Attaching an image to a tweet', 'media[]' => '@img03.jpg'));
+
 Contributors
 ============
 
