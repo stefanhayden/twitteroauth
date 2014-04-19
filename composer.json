@@ -4,6 +4,7 @@
         "php": ">=5.3.0"
     },
     "autoload": {
-        "classmap": ["twitteroauth/OAuth.php", "twitteroauth/twitteroauth.php"]
+        "classmap": ["twitteroauth/twitteroauth.php"],
+        "files": ["twitteroauth/OAuth.php"]
     }
 }
