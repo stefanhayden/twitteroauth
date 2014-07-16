@@ -274,7 +274,7 @@ class TwitterOAuth {
       $url = "{$this->stream_host}{$url}.{$this->format}";
     }
 
-    $request = OAuth\Request::from_consumer_and_token($this->consumer, $this->token, 'POST', $url, $parameters);
+    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, 'POST', $url, $parameters);
     $request->sign_request($this->sha1_method, $this->consumer, $this->token);
 
     $this->http_info = array();
